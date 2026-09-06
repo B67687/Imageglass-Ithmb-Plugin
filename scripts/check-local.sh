@@ -3,8 +3,8 @@
 #
 # One command runs every local-movable gate the GitHub CI runs, locally:
 #
-#   1. cargo clippy   (matches CI verify_clippy, -D warnings)
-#   2. cargo test     (matches CI verify_clippy)
+#   1. cargo clippy   (matches CI verify_clippy; Cargo.toml governs levels)
+#   2. cargo nextest  (matches CI verify_clippy)
 #   3. cargo build --release + symbol export verify + ABI smoke (matches CI build, Linux)
 #   4. cargo-deny     (matches CI verify_deny, pinned musl binary)
 #   5. gitleaks       (matches CI secrets, all commits)
@@ -22,11 +22,11 @@ cd "$(dirname "$0")/.."
 
 echo "── check:local — full local CI ──"
 
-echo "── [1] cargo clippy (all-features, all-targets, -D warnings)"
-cargo clippy --all-features --all-targets -- -D warnings
+echo "── [1] cargo clippy (all-features, all-targets; Cargo.toml governs)"
+cargo clippy --all-features --all-targets
 
-echo "── [2] cargo test"
-cargo test
+echo "── [2] cargo nextest (all-features, all-targets)"
+cargo nextest run --all-features --all-targets
 
 echo "── [3] cargo build --release + symbol export + ABI smoke (Linux)"
 cargo build --release
@@ -56,6 +56,13 @@ if [ ! -x "$DENY_BIN" ]; then
   DENY_BIN=/tmp/cargo-deny
 fi
 "$DENY_BIN" --log-level warn --manifest-path ./Cargo.toml --all-features check
+
+echo "── [5b] cargo machete (unused deps; CI verify_machete is the hard gate)"
+if cargo machete --help >/dev/null 2>&1; then
+  cargo machete
+else
+  echo "(skip: cargo-machete not installed locally; run: cargo install cargo-machete --version 0.9.2 --locked)"
+fi
 
 # Version SST: igplugin.json version must match Cargo.toml (single source of truth)
 echo "── [5] version SST (igplugin.json ↔ Cargo.toml)"

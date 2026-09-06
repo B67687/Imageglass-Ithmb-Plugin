@@ -155,6 +155,7 @@ pub(crate) fn ensure_initialized() {
         let plugin_version = encode_utf16(env!("CARGO_PKG_VERSION"));
         let cap_name = encode_utf16("iThmb Codec");
 
+        #[allow(clippy::as_underscore, reason = "targets are the declared Option<extern \"C\" fn> field types — inference is exact, no lossy conversion possible")]
         let codec_api = IGCodecApi {
             struct_size: std::mem::size_of::<IGCodecApi>() as i32,
             get_capability: Some(codec_get_capability as _),
@@ -174,6 +175,7 @@ pub(crate) fn ensure_initialized() {
             end_encode_multi_frame: None,
         };
 
+        #[allow(clippy::as_underscore, reason = "targets are the declared Option<extern \"C\" fn> field types — inference is exact, no lossy conversion possible")]
         let plugin_api = IGPluginApi {
             struct_size: std::mem::size_of::<IGPluginApi>() as i32,
             abi_version: IG_PLUGIN_ABI_VERSION,

@@ -6,11 +6,11 @@ build:
 
 # Run unit tests
 test:
-	cargo test
+	cargo nextest run --all-features --all-targets
 
-# Lint (CI enforces clippy all + pedantic as deny)
+# Lint (levels governed by Cargo.toml [lints.clippy] cherry-pick)
 lint:
-	cargo clippy --all-features --all-targets -- -D warnings
+	cargo clippy --all-features --all-targets
 
 # Full local CI gate (clippy + test + build + deny + gitleaks)
 check:
