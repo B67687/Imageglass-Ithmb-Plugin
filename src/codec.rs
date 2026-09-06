@@ -66,7 +66,7 @@ pub(crate) unsafe extern "C" fn codec_get_capability(cap: *mut *mut IGCodecCapab
 ///
 /// If `ext.data` is non-null with `ext.length > 0`, it must point to `ext.length`
 /// readable UTF-16 code units valid for the call. Null/empty inputs are rejected.
-/// Non-ASCII code units are truncated to u8 for logging only (see F-P1).
+/// Non-ASCII code units log as `?` (see F-P1 fix); the match below compares raw UTF-16.
 pub(crate) unsafe extern "C" fn codec_can_handle_extension(ext: IGStringRef) -> i32 {
     // The entire body runs inside catch_unwind: the host-facing logging block
     // below can panic on a hostile extension (e.g. an absurd Length), and a
@@ -86,10 +86,13 @@ pub(crate) unsafe extern "C" fn codec_can_handle_extension(ext: IGStringRef) -> 
                 let slice = unsafe { std::slice::from_raw_parts(ext.data, ext.length as usize) };
                 let n = slice.len().min(32);
                 for (i, &ch) in slice[..n].iter().enumerate() {
-                    ext_buf[i] = ch as u8;
+                    // F-P1 FIX: `ch as u8` truncated non-ASCII units to
+                    // arbitrary bytes (hostile input = invalid UTF-8 = UB
+                    // in from_utf8_unchecked below). Non-ASCII now logs '?'.
+                    ext_buf[i] = u8::try_from(ch).unwrap_or(b'?');
                 }
-                // SAFETY: all bytes came from ASCII u16 values (extensions
-                // are `.`, `i`, `t`, `h`, `m`, `b`, `p` only).
+                // SAFETY: every byte is ASCII (`.`/`i`/`t`/`h`/`m`/`b`/`p`) or
+                // `b'?'` — both valid UTF-8 by construction.
                 ext_str = unsafe { std::str::from_utf8_unchecked(&ext_buf[..n]) };
             }
             // SAFETY: `host_api.core` was filtered non-null above and
@@ -188,7 +191,8 @@ pub(crate) unsafe extern "C" fn codec_load_metadata(
         // Fast path: try device profiles (covers common device models).
         let formats = ithmb_core::device_profiles::find_formats_by_id(prefix);
         if let Some((w, h)) = formats.iter().find_map(|f| parse_dimensions(f.description)) {
-            fill_image_info(info, w, h, file_size as i64);
+            // SAFETY: `info` null-checked above; host-allocated per caller contract.
+            unsafe { fill_image_info(info, w, h, file_size as i64) };
             return IGStatus::Ok;
         }
         // Fallback: look up the prefix in the built-in ProfileDb (covers all 53 active profiles).
@@ -198,35 +202,39 @@ pub(crate) unsafe extern "C" fn codec_load_metadata(
         let Some(profile) = db.get(prefix) else {
             return IGStatus::NotImplemented;
         };
-        fill_image_info(
-            info,
-            profile.display_width() as usize,
-            profile.display_height() as usize,
-            file_size as i64,
-        );
+        // SAFETY: same as above.
+        unsafe {
+            fill_image_info(
+                info,
+                profile.display_width() as usize,
+                profile.display_height() as usize,
+                file_size as i64,
+            );
+        };
         IGStatus::Ok
     });
     result.unwrap_or(IGStatus::Internal)
 }
 
 /// Helper: fill the standard `IGImageInfo` fields for a decoded image.
-fn fill_image_info(info: *mut IGImageInfo, width: usize, height: usize, file_size: i64) {
-    // SAFETY: `info` is guaranteed by the caller (`codec_load_metadata`) to be
-    // non-null and to point at a host-allocated `IGImageInfo` that outlives
-    // this call.
-    unsafe {
-        (*info).width = width as i32;
-        (*info).height = height as i32;
-        (*info).pixel_format = 1; // IGPixelFormat::Bgra8Unorm
-        (*info).has_alpha = 1;
-        (*info).hdr_transfer_fn = 0; // IGHdrTransferFn::None
-        (*info).color_space = 1; // IGColorSpace::Srgb
-        (*info).orientation = 0; // EXIF 1..8; 0 = unknown
-        (*info).frame_count = 1;
-        (*info).file_size_bytes = file_size;
-        (*info).icc_profile_data = std::ptr::null();
-        (*info).icc_profile_size = 0;
-    }
+///
+/// # Safety
+///
+/// `info` must be non-null and point at a host-allocated `IGImageInfo`
+/// that outlives this call (F-P2: safe fn hid a raw-pointer deref).
+unsafe fn fill_image_info(info: *mut IGImageInfo, width: usize, height: usize, file_size: i64) {
+    // The unsafe ops below are covered by the fn-level contract above.
+    (*info).width = width as i32;
+    (*info).height = height as i32;
+    (*info).pixel_format = 1; // IGPixelFormat::Bgra8Unorm
+    (*info).has_alpha = 1;
+    (*info).hdr_transfer_fn = 0; // IGHdrTransferFn::None
+    (*info).color_space = 1; // IGColorSpace::Srgb
+    (*info).orientation = 0; // EXIF 1..8; 0 = unknown
+    (*info).frame_count = 1;
+    (*info).file_size_bytes = file_size;
+    (*info).icc_profile_data = std::ptr::null();
+    (*info).icc_profile_size = 0;
 }
 
 /// Parse a dimensions string (e.g. `"320×240"`) from a `DeviceFormatInfo` description.

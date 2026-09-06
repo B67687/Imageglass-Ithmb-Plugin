@@ -112,6 +112,20 @@ pub(crate) static HOST_API: OnceLock<HostApiPtr> = OnceLock::new();
 /// Global registry of live pixel-buffer allocations.
 pub(crate) static BUFFER_REGISTRY: OnceLock<BufferRegistry> = OnceLock::new();
 
+// F-P3 FIX: these were `const` inside the closure below, relying on implicit
+// const-promotion for process-lifetime pointers. `static` makes the lifetime
+// explicit — a future non-const-compatible edit can no longer silently
+// produce a dangling `IGStringRef.data`.
+static EXT_ITHMB_DATA: [u16; 6] = [
+    b'.' as u16,
+    b'i' as u16,
+    b't' as u16,
+    b'h' as u16,
+    b'm' as u16,
+    b'b' as u16,
+];
+static EXT_IPM_DATA: [u16; 4] = [b'.' as u16, b'i' as u16, b'p' as u16, b'm' as u16];
+
 // ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
@@ -120,15 +134,7 @@ pub(crate) static BUFFER_REGISTRY: OnceLock<BufferRegistry> = OnceLock::new();
 pub(crate) fn ensure_initialized() {
     // 1. Extensions array (static data — never moves, never freed).
     let _ = PLUGIN_EXTENSIONS.get_or_init(|| {
-        const EXT_ITHMB_DATA: [u16; 6] = [
-            b'.' as u16,
-            b'i' as u16,
-            b't' as u16,
-            b'h' as u16,
-            b'm' as u16,
-            b'b' as u16,
-        ];
-        const EXT_IPM_DATA: [u16; 4] = [b'.' as u16, b'i' as u16, b'p' as u16, b'm' as u16];
+        // `EXT_*_DATA` are `static`: valid for the process lifetime (see F-P3 above).
 
         ExtensionsArray([
             IGStringRef {
