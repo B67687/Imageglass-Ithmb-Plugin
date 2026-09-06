@@ -223,18 +223,22 @@ pub(crate) unsafe extern "C" fn codec_load_metadata(
 /// `info` must be non-null and point at a host-allocated `IGImageInfo`
 /// that outlives this call (F-P2: safe fn hid a raw-pointer deref).
 unsafe fn fill_image_info(info: *mut IGImageInfo, width: usize, height: usize, file_size: i64) {
-    // The unsafe ops below are covered by the fn-level contract above.
-    (*info).width = width as i32;
-    (*info).height = height as i32;
-    (*info).pixel_format = 1; // IGPixelFormat::Bgra8Unorm
-    (*info).has_alpha = 1;
-    (*info).hdr_transfer_fn = 0; // IGHdrTransferFn::None
-    (*info).color_space = 1; // IGColorSpace::Srgb
-    (*info).orientation = 0; // EXIF 1..8; 0 = unknown
-    (*info).frame_count = 1;
-    (*info).file_size_bytes = file_size;
-    (*info).icc_profile_data = std::ptr::null();
-    (*info).icc_profile_size = 0;
+    // SAFETY: `info` validity is the fn-level contract above; all writes are
+    // in-bounds field stores on the host-allocated struct (edition 2024
+    // requires this explicit inner block).
+    unsafe {
+        (*info).width = width as i32;
+        (*info).height = height as i32;
+        (*info).pixel_format = 1; // IGPixelFormat::Bgra8Unorm
+        (*info).has_alpha = 1;
+        (*info).hdr_transfer_fn = 0; // IGHdrTransferFn::None
+        (*info).color_space = 1; // IGColorSpace::Srgb
+        (*info).orientation = 0; // EXIF 1..8; 0 = unknown
+        (*info).frame_count = 1;
+        (*info).file_size_bytes = file_size;
+        (*info).icc_profile_data = std::ptr::null();
+        (*info).icc_profile_size = 0;
+    }
 }
 
 /// Parse a dimensions string (e.g. `"320×240"`) from a `DeviceFormatInfo` description.
