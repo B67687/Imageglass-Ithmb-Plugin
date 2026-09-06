@@ -7,8 +7,8 @@
 //! prevent double-free / dangling-pointer bugs.
 
 use std::panic::catch_unwind;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use libc::c_void;
 
@@ -18,13 +18,20 @@ use crate::allocator;
 #[allow(unused_imports)]
 use crate::buffer_registry::BufferRegistry;
 use crate::get_host_api;
-use crate::logging::{log_error, Logger};
+use crate::logging::{Logger, log_error};
 use crate::state::BUFFER_REGISTRY;
 use crate::strings::utf16_to_string;
-use crate::types::{ig_status_from_decode_error, IGPixelBuffer, IGStatus, IGStringRef};
+use crate::types::{IGPixelBuffer, IGStatus, IGStringRef, ig_status_from_decode_error};
 
 /// Decodes a static raster frame from an .ithmb file into the caller's
 /// [`IGPixelBuffer`].
+///
+/// # Safety
+///
+/// - `path` must be a valid `IGStringRef` (null data or negative length
+///   is rejected as `InvalidArg` via `utf16_to_string`).
+/// - `buffer` must be non-null and point to a host-allocated `IGPixelBuffer`
+///   that outlives the call; the plugin writes all fields on success.
 pub(crate) unsafe extern "C" fn codec_decode_static_raster(
     path: IGStringRef,
     frame_index: i32,
@@ -131,6 +138,13 @@ pub(crate) unsafe extern "C" fn codec_decode_static_raster(
     result.unwrap_or(IGStatus::Internal)
 }
 
+/// Releases a pixel buffer previously filled by [`codec_decode_static_raster`].
+///
+/// # Safety
+///
+/// - `buffer` may be null (no-op). Otherwise it must point to the host-owned
+///   `IGPixelBuffer` this plugin filled — the plugin reads its `data` pointer
+///   and zeroes the struct fields.
 pub(crate) unsafe extern "C" fn codec_free_pixel_buffer(buffer: *mut IGPixelBuffer) {
     #[allow(clippy::let_unit_value)]
     let _ = catch_unwind(|| {
@@ -311,9 +325,11 @@ mod tests {
         unsafe { codec_free_pixel_buffer(std::ptr::from_mut(&mut buffer)) };
         assert!(buffer.data.is_null());
         assert_eq!(buffer.width, 0);
-        assert!(crate::state::BUFFER_REGISTRY
-            .get()
-            .is_none_or(BufferRegistry::is_empty));
+        assert!(
+            crate::state::BUFFER_REGISTRY
+                .get()
+                .is_none_or(BufferRegistry::is_empty)
+        );
         std::fs::remove_file(&path).ok();
     }
 }

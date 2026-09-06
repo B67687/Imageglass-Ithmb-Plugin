@@ -58,8 +58,9 @@ pub enum IGStatus {
 /// # Safety
 ///
 /// `data` must point to a valid UTF-16 buffer with at least `length` code
-/// units.  The buffer is owned by the producer and must not be freed by
-/// the consumer unless ownership has been explicitly transferred.
+/// units. A negative `length` is never valid — treat it as a corrupt input,
+/// not as a large unsigned size. The buffer is owned by the producer and
+/// must not be freed by the consumer unless ownership has been explicitly transferred.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct IGStringRef {

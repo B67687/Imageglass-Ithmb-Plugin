@@ -54,7 +54,7 @@ mod strings;
 use std::panic::catch_unwind;
 
 use crate::logging::Logger;
-use crate::state::{ensure_initialized, HostApiPtr, HOST_API, PLUGIN_STATE};
+use crate::state::{HOST_API, HostApiPtr, PLUGIN_STATE, ensure_initialized};
 use crate::types::{IGCodecApi, IGHostApi, IGPluginApi, IGStatus};
 
 // ---------------------------------------------------------------------------
@@ -79,6 +79,11 @@ pub(crate) const MAX_FILE_SIZE_BYTES: u64 = 8 * 1024 * 1024;
 ///
 /// We expose exactly one codec (index 0).  All other indices write a null
 /// pointer and return success.
+/// # Safety
+///
+/// No preconditions beyond the ABI: a null `codec` out-pointer is rejected
+/// with `InvalidArg`. Any non-null `codec` must reference a writable
+/// `IGCodecApi*` slot owned by the host.
 pub(crate) unsafe extern "C" fn plugin_get_codec(
     index: i32,
     codec: *mut *const IGCodecApi,
@@ -88,6 +93,8 @@ pub(crate) unsafe extern "C" fn plugin_get_codec(
             return IGStatus::InvalidArg;
         }
         if index != 0 {
+            // SAFETY: `codec` was validated non-null above; points to a
+            // host-owned writable `IGCodecApi*` slot.
             unsafe {
                 *codec = std::ptr::null();
             }
@@ -110,11 +117,20 @@ pub(crate) unsafe extern "C" fn plugin_get_codec(
 
 /// Plugin initialisation — the host API was already stored in the entry
 /// point, so this is a no-op.
+///
+/// # Safety
+///
+/// No preconditions — takes no arguments.
 pub(crate) unsafe extern "C" fn plugin_initialize() -> IGStatus {
     IGStatus::Ok
 }
 
 /// Shuts down the plugin.
+///
+/// # Safety
+///
+/// No preconditions — takes no arguments. The host API pointer read
+/// inside was stored at entry and stays valid until process unload.
 pub(crate) unsafe extern "C" fn plugin_shutdown() {
     let _ = catch_unwind(|| {
         if let Some(host_ptr) = HOST_API.get() {
@@ -132,6 +148,10 @@ pub(crate) unsafe extern "C" fn plugin_shutdown() {
 }
 
 /// Trivial self-test — always passes.
+///
+/// # Safety
+///
+/// No preconditions — takes no arguments.
 pub(crate) unsafe extern "C" fn plugin_self_test() -> IGStatus {
     IGStatus::Ok
 }

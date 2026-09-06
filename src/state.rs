@@ -17,11 +17,11 @@ use crate::codec::{
 use crate::decode::{codec_decode_static_raster, codec_free_pixel_buffer};
 use crate::strings::encode_utf16;
 use crate::types::{
-    ig_string_ref_null, IGCodecApi, IGCodecCapability, IGHostApi, IGPluginApi, IGPluginInfo,
-    IGStringRef,
+    IGCodecApi, IGCodecCapability, IGHostApi, IGPluginApi, IGPluginInfo, IGStringRef,
+    ig_string_ref_null,
 };
 use crate::{
-    plugin_get_codec, plugin_initialize, plugin_self_test, plugin_shutdown, IG_PLUGIN_ABI_VERSION,
+    IG_PLUGIN_ABI_VERSION, plugin_get_codec, plugin_initialize, plugin_self_test, plugin_shutdown,
 };
 
 // ---------------------------------------------------------------------------

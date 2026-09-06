@@ -25,6 +25,12 @@ use crate::types::{IGCodecCapability, IGImageInfo, IGStatus, IGStringRef};
 /// the lifetime of the plugin.  The host never fills a buffer: since SDK
 /// v1.1.0 the host cannot know the capability's size beforehand, so the
 /// plugin allocates it and hands back the address.
+///
+/// # Safety
+///
+/// The `caller` (`ImageGlass` `host`) must pass a writable `*mut IGCodecCapability` slot,
+/// or null (rejected with `InvalidArg`). The stored pointer borrows plugin-lifetime
+/// statics and must never be freed by the host.
 pub(crate) unsafe extern "C" fn codec_get_capability(cap: *mut *mut IGCodecCapability) -> IGStatus {
     let result = catch_unwind(|| -> IGStatus {
         if cap.is_null() {
@@ -55,6 +61,12 @@ pub(crate) unsafe extern "C" fn codec_get_capability(cap: *mut *mut IGCodecCapab
 /// Checks whether the given file extension is supported.
 ///
 /// Performs a case-insensitive ASCII comparison against `.ithmb` and `.ipm`.
+///
+/// # Safety
+///
+/// If `ext.data` is non-null with `ext.length > 0`, it must point to `ext.length`
+/// readable UTF-16 code units valid for the call. Null/empty inputs are rejected.
+/// Non-ASCII code units are truncated to u8 for logging only (see F-P1).
 pub(crate) unsafe extern "C" fn codec_can_handle_extension(ext: IGStringRef) -> i32 {
     // The entire body runs inside catch_unwind: the host-facing logging block
     // below can panic on a hostile extension (e.g. an absurd Length), and a
@@ -132,6 +144,11 @@ pub(crate) unsafe extern "C" fn codec_can_handle_extension(ext: IGStringRef) -> 
 
 /// .ithmb files have no fixed magic signature at offset 0.
 /// We rely on extension matching + decode priority for selection.
+///
+/// # Safety
+///
+/// Takes no action on `_data`/`_len` (always returns 0); any pointer, including null,
+/// is safe to pass.
 pub(crate) unsafe extern "C" fn codec_can_handle_signature(_data: *const u8, _len: i32) -> i32 {
     0
 }
@@ -142,6 +159,11 @@ pub(crate) unsafe extern "C" fn codec_can_handle_signature(_data: *const u8, _le
 
 /// Reads metadata from an .ithmb file by extracting the 4-byte format prefix
 /// and looking up the known dimensions from the profile database.
+///
+/// # Safety
+///
+/// `info` must be a writable `*mut IGImageInfo` slot, or null (rejected with
+/// `InvalidArg`). `path` must satisfy `utf16_to_string`'s contract (see `strings.rs`).
 pub(crate) unsafe extern "C" fn codec_load_metadata(
     path: IGStringRef,
     info: *mut IGImageInfo,

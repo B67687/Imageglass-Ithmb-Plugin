@@ -5,8 +5,8 @@
 
 use std::io::Read;
 
-use crate::types::IGStatus;
 use crate::MAX_FILE_SIZE_BYTES;
+use crate::types::IGStatus;
 
 /// Check that `path` exists and its size does not exceed [`MAX_FILE_SIZE_BYTES`].
 ///

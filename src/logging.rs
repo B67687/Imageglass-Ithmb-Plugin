@@ -12,7 +12,7 @@
 //! means the host-provided API table is valid for the entire lifetime of
 //! the plugin.
 
-use crate::types::{ig_string_ref_from_str, IGHostCoreApi};
+use crate::types::{IGHostCoreApi, ig_string_ref_from_str};
 
 // ---------------------------------------------------------------------------
 // LogLevel
@@ -82,14 +82,14 @@ impl Logger {
             return;
         }
 
-        // Safety: the caller promises the pointer is valid.
+        // SAFETY: the caller promises the pointer is valid.
         let Some(log_fn) = (unsafe { (*self.host).log }) else {
             return;
         };
 
         let (_utf16_buf, string_ref) = ig_string_ref_from_str(message);
 
-        // Safety: the caller promises the host API is alive.  `string_ref`
+        // SAFETY: the caller promises the host API is alive.  `string_ref`
         // borrows from `utf16_buf` which lives for the duration of this call.
         unsafe {
             log_fn(level as i32, string_ref);
@@ -104,7 +104,7 @@ impl Logger {
     ///
     /// Same safety contract as [`Logger::log`].
     pub unsafe fn info(&self, message: &str) {
-        // Safety: deferred to the caller.
+        // SAFETY: deferred to the caller.
         unsafe { self.log(LogLevel::Info, message) }
     }
 
@@ -114,7 +114,7 @@ impl Logger {
     ///
     /// Same safety contract as [`Logger::log`].
     pub unsafe fn warn(&self, message: &str) {
-        // Safety: deferred to the caller.
+        // SAFETY: deferred to the caller.
         unsafe { self.log(LogLevel::Warning, message) }
     }
 
@@ -124,7 +124,7 @@ impl Logger {
     ///
     /// Same safety contract as [`Logger::log`].
     pub unsafe fn error(&self, message: &str) {
-        // Safety: deferred to the caller.
+        // SAFETY: deferred to the caller.
         unsafe { self.log(LogLevel::Error, message) }
     }
 }
@@ -149,7 +149,7 @@ impl Logger {
 #[allow(unused_macros)]
 macro_rules! log_info {
     ($logger:expr, $($arg:tt)*) => {
-        // Safety: deferred to the caller.
+        // SAFETY: deferred to the caller.
         unsafe { $logger.log($crate::logging::LogLevel::Info, &format!($($arg)*)) }
     };
 }
@@ -157,7 +157,7 @@ macro_rules! log_info {
 #[allow(unused_macros)]
 macro_rules! log_warn {
     ($logger:expr, $($arg:tt)*) => {
-        // Safety: deferred to the caller.
+        // SAFETY: deferred to the caller.
         unsafe { $logger.log($crate::logging::LogLevel::Warning, &format!($($arg)*)) }
     };
 }
@@ -165,7 +165,7 @@ macro_rules! log_warn {
 #[allow(unused_macros)]
 macro_rules! log_error {
     ($logger:expr, $($arg:tt)*) => {
-        // Safety: deferred to the caller.
+        // SAFETY: deferred to the caller.
         unsafe { $logger.log($crate::logging::LogLevel::Error, &format!($($arg)*)) }
     };
 }
