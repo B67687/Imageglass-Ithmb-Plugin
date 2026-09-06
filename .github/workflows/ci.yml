@@ -129,7 +129,7 @@ jobs:
           cache-key: "plugin-clippy"
       - name: cargo clippy
         run: cargo clippy --all-features --all-targets
-      - name: cargo test
+      - name: Install cargo-nextest
       - uses: taiki-e/install-action@7b8d4719ee4aaa279bdf55df38dacb9ebfe12a6c # v2.87.6
         with:
           tool: nextest@0.9.143
