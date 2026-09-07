@@ -18,7 +18,7 @@ cargo clippy --all-features --all-targets -- -D warnings
 cargo fmt --check
 
 # Tests
-cargo test
+cargo nextest run --all-features --all-targets
 ```
 
 ## Versioning

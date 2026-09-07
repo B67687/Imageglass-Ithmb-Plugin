@@ -87,13 +87,13 @@ Feature lifecycle follows Development-Protocol docs/engineering-plugin.md §1.1:
 - **Memory rule**: Plugin allocates pixel buffers via its own allocator (`libc::malloc`), not the host allocator. Whoever allocates, frees.
 - **Buffer tracking**: `BufferRegistry` in `buffer_registry.rs` tracks live pixel buffers to prevent double-free and use-after-free.
 - **Unit tests**: live in `src/` (`decode.rs`, `buffer_registry.rs`, `codec.rs`, `lib.rs`). `tests/` holds only the `test1.ithmb` data fixture.
-- **CI**: GitHub Actions on push/PR to `main` and on `v*` tags: 3-OS build + symbol export verify, clippy, cargo test, cargo-deny, gitleaks, and release creation on tags.
+- **CI**: GitHub Actions on push/PR to `main` and on `v*` tags: 3-OS build + symbol export verify, clippy, cargo nextest, cargo-deny, gitleaks, and release creation on tags.
 
 ## Key Commands
 
 ```bash
 cargo build --release                          # Build the cdylib
-cargo test                                     # Run unit tests (in src/)
+cargo nextest run --all-features --all-targets   # Run unit tests (in src/)
 cargo clippy --all-features --all-targets -- -D warnings   # CI-enforced lint
 ./scripts/package.sh [linux|macos|windows]     # Package into dist/ithmb-codec-<platform>.igplugin.zip
 python3 scripts/abi-smoke.py tests/fixtures/test1.ithmb   # ABI smoke test (ctypes, no GUI)

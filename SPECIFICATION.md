@@ -9,11 +9,11 @@
 
 **Design influences:** Volere (Robertson & Robertson 2006): requirements shell; IEEE 830 / ISO 29148: SRS structure; Shape Up (Singer 2019): pitch format; Jackson Problem Frames (2001): domain analysis.
 
-| Layer | Level | Scope | Changing this requires |
-| --- | --- | --- | --- |
-| **MACRO** | System | Decisions constraining the entire project | A learning shift (RULES.md section 5) |
-| **MESO** | Component | Contracts between components | Interface renegotiation |
-| **MICRO** | Implementation | Bounds within which the executor has freedom | None: executor decides within bounds |
+| Layer     | Level          | Scope                                        | Changing this requires                |
+| --------- | -------------- | -------------------------------------------- | ------------------------------------- |
+| **MACRO** | System         | Decisions constraining the entire project    | A learning shift (RULES.md section 5) |
+| **MESO**  | Component      | Contracts between components                 | Interface renegotiation               |
+| **MICRO** | Implementation | Bounds within which the executor has freedom | None: executor decides within bounds  |
 
 **Format per section:** MACRO = system-level decision (heavy rationale); MESO = component contracts; MICRO = implementation bounds.
 
@@ -299,7 +299,7 @@ Acceptance criteria in EARS notation:
 > WHEN a release tag (v*) is pushed
 > THEN CI SHALL build all three platforms, package dist/*.igplugin.zip, and create a GitHub Release with CHANGELOG.md as notes.
 
-**MESO/MICRO:** Local parity is enforced by `scripts/check-local.sh` (clippy -D warnings, cargo test, release build + symbol verify + ABI smoke, cargo-deny, gitleaks) and `scripts/check-parity.sh` asserts local and GitHub CI agree on the same commit. Concrete commands: `cargo clippy --all-features --all-targets -- -D warnings`, `cargo test`, `cargo build --release`, `python3 scripts/abi-smoke.py tests/fixtures/test1.ithmb`, `/tmp/cargo-deny --log-level warn --manifest-path ./Cargo.toml --all-features check`, `/tmp/gitleaks git --no-banner --log-opts="--no-merges --all"`.
+**MESO/MICRO:** Local parity is enforced by `scripts/check-local.sh` (clippy -D warnings, cargo nextest, release build + symbol verify + ABI smoke, cargo-deny, gitleaks) and `scripts/check-parity.sh` asserts local and GitHub CI agree on the same commit. Concrete commands: `cargo clippy --all-features --all-targets -- -D warnings`, `cargo nextest run --all-features --all-targets`, `cargo build --release`, `python3 scripts/abi-smoke.py tests/fixtures/test1.ithmb`, `/tmp/cargo-deny --log-level warn --manifest-path ./Cargo.toml --all-features check`, `/tmp/gitleaks git --no-banner --log-opts="--no-merges --all"`.
 
 ---
 
@@ -307,14 +307,14 @@ Acceptance criteria in EARS notation:
 
 ### MACRO: System Dependencies
 
-| Package | Version | Purpose | Contract | License |
-|---------|---------|---------|----------|---------|
-| ithmb-core | 1.9 (crates.io, locked 1.9.9) | .ithmb decoding, profile DB, device profiles | `decode_ithmb(&[u8], &AtomicBool) -> Result<DecodedImage, DecodeError>`; `profile_db::ProfileDb::load_builtin()`; `device_profiles::find_formats_by_id(i32)` | MIT |
-| libc | 0.2 | malloc/free for plugin-owned pixel buffers, c_void | `libc::malloc` / `libc::free` | MIT / Apache-2.0 |
-| Rust toolchain | 1.88.0 (rust-toolchain.toml) | compiler, edition 2024 | cdylib crate-type, lints | MIT / Apache-2.0 |
-| cargo-deny | 0.20.2 (pinned musl binary) | supply-chain audit | deny.toml policy: licenses allowlist, multiple-versions deny, crates.io-only registry | Apache-2.0 |
-| gitleaks | 8.24.3 (pinned binary) | secrets scan of git history | scans all commits, no-merges | MIT |
-| ImageGlass host | v10, SDK v1.1.0, build 10.0.3.805+ | host services: logging, allocation, cancellation | `ig_plugin_get_api(int32_t, const IGHostApi*)` ABI contract; host validates IGCodecApi.StructSize | proprietary (host) |
+| Package         | Version                            | Purpose                                            | Contract                                                                                                                                                     | License            |
+| --------------- | ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| ithmb-core      | 1.9 (crates.io, locked 1.9.9)      | .ithmb decoding, profile DB, device profiles       | `decode_ithmb(&[u8], &AtomicBool) -> Result<DecodedImage, DecodeError>`; `profile_db::ProfileDb::load_builtin()`; `device_profiles::find_formats_by_id(i32)` | MIT                |
+| libc            | 0.2                                | malloc/free for plugin-owned pixel buffers, c_void | `libc::malloc` / `libc::free`                                                                                                                                | MIT / Apache-2.0   |
+| Rust toolchain  | 1.88.0 (rust-toolchain.toml)       | compiler, edition 2024                             | cdylib crate-type, lints                                                                                                                                     | MIT / Apache-2.0   |
+| cargo-deny      | 0.20.2 (pinned musl binary)        | supply-chain audit                                 | deny.toml policy: licenses allowlist, multiple-versions deny, crates.io-only registry                                                                        | Apache-2.0         |
+| gitleaks        | 8.24.3 (pinned binary)             | secrets scan of git history                        | scans all commits, no-merges                                                                                                                                 | MIT                |
+| ImageGlass host | v10, SDK v1.1.0, build 10.0.3.805+ | host services: logging, allocation, cancellation   | `ig_plugin_get_api(int32_t, const IGHostApi*)` ABI contract; host validates IGCodecApi.StructSize                                                            | proprietary (host) |
 
 **MESO/MICRO:** The C ABI contract with the ImageGlass host is the key external contract. It is a two-argument entry point (the one-argument form is the pre-1.1.0 ABI), StructSize-first tables, UTF-16 string refs, i32 booleans, and stable append-only enum values. ithmb-core is the only decode dependency and is compiled statically into the cdylib; there is no runtime-loaded shared library. Versions are pinned: Cargo.lock is committed, rust-toolchain.toml pins 1.88.0, and CI tool binaries are pinned by exact version in their download URLs. No new runtime dependency may be added without a Y-Statement in section 2.
 
@@ -354,19 +354,19 @@ THEN the system SHALL return a mapped error status and never panic.
 
 **MESO: Error Contract:**
 
-| Condition | Error | Remediation | Log Level |
-|-----------|-------|-------------|-----------|
-| Null buffer / null info / null capability slot | InvalidArg | Caller fixes its arguments | info |
-| Non-zero frame index | InvalidArg | Only frame 0 is supported | info |
-| File missing or unreadable | IoError | Caller surfaces the path | error |
-| File larger than 8 MiB | DecodeFailed | Rejected before reading | warn |
-| Unknown format prefix | NotImplemented | Caller tries another codec | info |
-| Decode failure (JPEG/profile) | DecodeFailed | Caller shows a decode error | error |
-| Invalid format / short buffer | InvalidArg | Caller rejects the file | warn |
-| Unsupported feature | Unsupported | Caller reports unsupported | warn |
-| Cancellation requested | Canceled | Caller stops the operation | info |
-| Allocation failure / stride overflow | OutOfMemory | Caller frees and retries | error |
-| Any panic caught at the boundary | Internal | Caller treats as internal failure | error |
+| Condition                                      | Error          | Remediation                       | Log Level |
+| ---------------------------------------------- | -------------- | --------------------------------- | --------- |
+| Null buffer / null info / null capability slot | InvalidArg     | Caller fixes its arguments        | info      |
+| Non-zero frame index                           | InvalidArg     | Only frame 0 is supported         | info      |
+| File missing or unreadable                     | IoError        | Caller surfaces the path          | error     |
+| File larger than 8 MiB                         | DecodeFailed   | Rejected before reading           | warn      |
+| Unknown format prefix                          | NotImplemented | Caller tries another codec        | info      |
+| Decode failure (JPEG/profile)                  | DecodeFailed   | Caller shows a decode error       | error     |
+| Invalid format / short buffer                  | InvalidArg     | Caller rejects the file           | warn      |
+| Unsupported feature                            | Unsupported    | Caller reports unsupported        | warn      |
+| Cancellation requested                         | Canceled       | Caller stops the operation        | info      |
+| Allocation failure / stride overflow           | OutOfMemory    | Caller frees and retries          | error     |
+| Any panic caught at the boundary               | Internal       | Caller treats as internal failure | error     |
 
 **MICRO:** All strings crossing the boundary are UTF-16 IGStringRefs with length in code units. Pixel format is always Bgra8Unorm (1). Metadata reports sRGB, no HDR, no ICC profile, frame_count 1.
 
@@ -385,7 +385,7 @@ Appetite: the project shipped over ~5 weeks (2026-07-13 to 2026-08-16) plus hard
 | M2 | v1.1.0 SDK v1.1.0 ABI port | StructSize-first tables, plugin-allocated capability, module split | WHEN the ABI smoke test runs THEN the full codec path passes |
 | M3 | v1.1.1 ithmb-core 1.9.6 | profile 1044 disabled, 53 active profiles | WHEN a known device file decodes THEN dimensions are correct |
 | M4 | v1.1.3 ithmb-core 1.9.9 | zune-jpeg migration | WHEN a grayscale JPEG decodes THEN output is correct |
-| M5 | CI hardening (ADR-0001) | cargo test in CI, Windows PE export verify, pinned deny | WHEN CI runs THEN all 5 jobs pass |
+| M5 | CI hardening (ADR-0001) | cargo nextest in CI, Windows PE export verify, pinned deny | WHEN CI runs THEN all 5 jobs pass |
 | M6 | Standards audit fixes | 40 audit failures reduced to 9 | WHEN the audit re-runs THEN failures are resolved |
 | M7 | REVIEW gate + governance docs | this SPECIFICATION, EXPLAINER, RULES, PROJECT_MODEL, FEATURES | WHEN REVIEW runs THEN Document Completeness and Protocol Compliance pass |
 
@@ -405,23 +405,23 @@ Contingency: IF a decode regression appears in a released version THEN revert th
 Unit coverage target: 4 of 9 modules have unit tests (lib.rs, decode.rs, buffer_registry.rs, codec.rs); overall module coverage is under 50%. Honest target: raise module coverage above 50% by adding tests for state.rs, strings.rs, allocator.rs, types.rs, logging.rs.
 Integration scope: the full codec path through the real C entry point (scripts/abi-smoke.py)
 E2E coverage: manual verification in ImageGlass v10 (no automated GUI tests)
-Framework: Rust built-in test harness (cargo test); no external test dependencies
+Framework: Rust built-in test harness, executed via cargo nextest (0.9.143); no other external test dependencies
 ```
 
 **MESO: Per-Component Test Requirements:**
 
-| Module | Test Type | Target | Notes |
-|--------|-----------|--------|-------|
-| lib.rs | unit | entry-point validation, ABI struct sizes | 5 tests: null host, ABI major mismatch, undersized host, valid table, struct sizes (112/104/16/8) |
-| decode.rs | unit + pseudo-fuzz | decode paths, buffer lifecycle | 4 tests + deterministic fuzz (3000 mutations, fixed seed, decoder never panics) |
-| buffer_registry.rs | unit | register/unregister/contains | 7 tests incl. double-register, unknown unregister, null key |
-| codec.rs | unit | capability, extension matching, metadata | 8 tests incl. case-insensitive matching, dimension parsing, profile fixture |
-| state.rs | none |: | untested directly; exercised indirectly by every FFI test via ensure_initialized |
-| strings.rs | none |: | untested directly; exercised via codec/decode tests |
-| allocator.rs | none |: | untested directly; exercised via decode roundtrip |
-| types.rs | none |: | untested directly; ig_status_from_decode_error exercised via decode tests |
-| logging.rs | none |: | untested; host logging is a no-op when the host pointer is null |
-| integration | ABI smoke | scripts/abi-smoke.py through the real C entry point | runs in CI on Linux and in check-local.sh |
+| Module             | Test Type          | Target                                              | Notes                                                                                             |
+| ------------------ | ------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| lib.rs             | unit               | entry-point validation, ABI struct sizes            | 5 tests: null host, ABI major mismatch, undersized host, valid table, struct sizes (112/104/16/8) |
+| decode.rs          | unit + pseudo-fuzz | decode paths, buffer lifecycle                      | 4 tests + deterministic fuzz (3000 mutations, fixed seed, decoder never panics)                   |
+| buffer_registry.rs | unit               | register/unregister/contains                        | 7 tests incl. double-register, unknown unregister, null key                                       |
+| codec.rs           | unit               | capability, extension matching, metadata            | 8 tests incl. case-insensitive matching, dimension parsing, profile fixture                       |
+| state.rs           | none               | :                                                   | untested directly; exercised indirectly by every FFI test via ensure_initialized                  |
+| strings.rs         | none               | :                                                   | untested directly; exercised via codec/decode tests                                               |
+| allocator.rs       | none               | :                                                   | untested directly; exercised via decode roundtrip                                                 |
+| types.rs           | none               | :                                                   | untested directly; ig_status_from_decode_error exercised via decode tests                         |
+| logging.rs         | none               | :                                                   | untested; host logging is a no-op when the host pointer is null                                   |
+| integration        | ABI smoke          | scripts/abi-smoke.py through the real C entry point | runs in CI on Linux and in check-local.sh                                                         |
 
 **MICRO:** One behavior per test. Test names describe the expected outcome (`decode_rejects_null_buffer`, not `test_decode`). Edge cases are explicit (null pointers, empty refs, hostile input). The pseudo-fuzz harness is deterministic (fixed seed 0x5EED_2026_1B8E_F00D) and asserts the one invariant that matters at the FFI boundary: the decoder never panics.
 
@@ -458,14 +458,14 @@ Changelog: manual (CHANGELOG.md, used as GitHub release notes)
 
 _Every product surfaces to its audience through a set of distribution surfaces. Enumerate ALL of them and when each is built._
 
-| Surface | Built when? | Purpose / audience |
-| --- | --- | --- |
-| .igplugin.zip package | every release (scripts/package.sh + CI) | the primary surface: ImageGlass v10 plugin manager installs this |
-| GitHub Releases | every v* tag (CI release job) | distribution channel for all three platform packages |
-| C ABI (cdylib) | every build | language interoperability; the FFI surface any host can call |
-| Web demo (ithmb-codec.dev) | upstream Ithmb-Codec project | browser reach, zero-install evaluation of the codec |
-| docs.rs (ithmb-core-cabi) | crate publish | API reference for the crate metadata |
-| README + docs | maintained continuously | onboarding, integration instructions, FFI example |
+| Surface                    | Built when?                             | Purpose / audience                                               |
+| -------------------------- | --------------------------------------- | ---------------------------------------------------------------- |
+| .igplugin.zip package      | every release (scripts/package.sh + CI) | the primary surface: ImageGlass v10 plugin manager installs this |
+| GitHub Releases            | every v* tag (CI release job)           | distribution channel for all three platform packages             |
+| C ABI (cdylib)             | every build                             | language interoperability; the FFI surface any host can call     |
+| Web demo (ithmb-codec.dev) | upstream Ithmb-Codec project            | browser reach, zero-install evaluation of the codec              |
+| docs.rs (ithmb-core-cabi)  | crate publish                           | API reference for the crate metadata                             |
+| README + docs              | maintained continuously                 | onboarding, integration instructions, FFI example                |
 
 Distribution surfaces differ by money tier: this is a **library/plugin** tier, so the surfaces are docs + examples + the packaged plugin. Each surface's build milestone is listed in Section 7.
 
@@ -475,18 +475,18 @@ Distribution surfaces differ by money tier: this is a **library/plugin** tier, s
 
 Intent: How does this project make goalpost shifts cheap instead of expensive?
 
-| Rule | Applied? | How |
-| --- | --- | --- |
-| Interface Rule (no interface before 2nd consumer) | Yes | The C ABI is the single interface; no internal trait abstractions were invented before a second consumer existed |
-| Test Rule (contract over implementation) | Yes | Tests assert the ABI contract (struct sizes, status codes, extension matching), not internal implementation |
-| Module Boundary (single entry point) | Yes | ig_plugin_get_api is the only exported symbol; every module has one responsibility |
-| Size Rule (250/40 LOC limits) | Yes | All modules under the 250-LOC non-test ceiling; lib.rs was split in v1.1.0 to comply |
-| Cycle Rule (shippable per cycle) | Yes | Milestone-based releases on v* tags; every milestone ships a working plugin |
-| Appetite Rule (time before scope) | Yes | Decode-only V1; encode deferred until ithmb-core ships an encoder |
-| AI Rule (same structural checks) | Yes | AI-generated code passes the same clippy/test/deny/parity gates as human code |
-| Rule of Three (extract on 3rd) | Yes | Module extraction happened when lib.rs outgrew its bounds (v1.1.0 split) |
-| Dependency Rule (core ≠ infra) | Yes | ithmb-core is the only decode dependency; the plugin is thin glue with no infra coupling |
-| Clean Backlog (no perpetual) | Yes | OUT OF SCOPE items are explicit; encode is blocked on an upstream dependency, not silently carried |
+| Rule                                              | Applied? | How                                                                                                              |
+| ------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| Interface Rule (no interface before 2nd consumer) | Yes      | The C ABI is the single interface; no internal trait abstractions were invented before a second consumer existed |
+| Test Rule (contract over implementation)          | Yes      | Tests assert the ABI contract (struct sizes, status codes, extension matching), not internal implementation      |
+| Module Boundary (single entry point)              | Yes      | ig_plugin_get_api is the only exported symbol; every module has one responsibility                               |
+| Size Rule (250/40 LOC limits)                     | Yes      | All modules under the 250-LOC non-test ceiling; lib.rs was split in v1.1.0 to comply                             |
+| Cycle Rule (shippable per cycle)                  | Yes      | Milestone-based releases on v* tags; every milestone ships a working plugin                                      |
+| Appetite Rule (time before scope)                 | Yes      | Decode-only V1; encode deferred until ithmb-core ships an encoder                                                |
+| AI Rule (same structural checks)                  | Yes      | AI-generated code passes the same clippy/test/deny/parity gates as human code                                    |
+| Rule of Three (extract on 3rd)                    | Yes      | Module extraction happened when lib.rs outgrew its bounds (v1.1.0 split)                                         |
+| Dependency Rule (core ≠ infra)                    | Yes      | ithmb-core is the only decode dependency; the plugin is thin glue with no infra coupling                         |
+| Clean Backlog (no perpetual)                      | Yes      | OUT OF SCOPE items are explicit; encode is blocked on an upstream dependency, not silently carried               |
 
 ---
 
@@ -533,11 +533,11 @@ Rationale: the project was built with heavy AI assistance; full transparency bui
 
 **MESO: Tool Inventory:**
 
-| Tool | Version | Permitted Uses | Citation Format |
-|------|---------|----------------|-----------------|
-| DeepSeek V4 Flash | current | implementation, research, discussion | docs/CREDITS.md table |
-| OpenCode | current | harness, agent execution | README badge + docs/CREDITS.md |
-| Oh My OpenAgent | current | harness, agent execution | README badge + docs/CREDITS.md |
+| Tool              | Version | Permitted Uses                       | Citation Format                |
+| ----------------- | ------- | ------------------------------------ | ------------------------------ |
+| DeepSeek V4 Flash | current | implementation, research, discussion | docs/CREDITS.md table          |
+| OpenCode          | current | harness, agent execution             | README badge + docs/CREDITS.md |
+| Oh My OpenAgent   | current | harness, agent execution             | README badge + docs/CREDITS.md |
 
 **MICRO:** README carries "Built with AI assistance" and badge links to docs/CREDITS.md. docs/CREDITS.md lists the model, harness, and role per phase. No AI attribution appears in the binary or the .igplugin.zip package. Commit messages carry no Co-authored-by or tool attribution trailers.
 
@@ -559,6 +559,7 @@ Rationale: the project was built with heavy AI assistance; full transparency bui
 - [x] **Test anchoring**: every test references a feature ID (F-###); a test proving no feature contract is flagged, not silently carried
 
 For engineering deliverables, also verify from the Engineering Plugin:
+
 - [x] Quality gates (plugin §1) have concrete commands (section 4)
 - [ ] Fuzz targets exist in `fuzz/` directory (Tier 2+). NOT APPLICABLE: deterministic pseudo-fuzz lives in src/decode.rs (std-only, no external fuzz crate)
 - [ ] Benchmark suite exists in `benches/` (performance-sensitive). NOT APPLICABLE: decode performance is bounded by ithmb-core, not this plugin

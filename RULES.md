@@ -10,20 +10,20 @@
 
 ---
 
-| # | Section |
-|---|---------|
-| 1. | [Project Type Routing](#1-project-type-routing) |
-| 2. | [Intent Decomposition (Recursive Breakdown)](#2-intent-decomposition-recursive-breakdown) |
-| 3. | [Constitution (Immutable)](#3-constitution-immutable) |
-| 4. | [Phase Definitions](#4-phase-definitions) |
-| 5. | [V1 Scope & Learning Shifts](#5-v1-scope--learning-shifts) |
-| 6. | [AI Persona & Constraints](#6-ai-persona--constraints) |
-| 7. | [Stop Rules](#7-stop-rules) |
-| 8. | [Verification Gates](#8-verification-gates) |
-| 9. | [Test Philosophy](#9-test-philosophy) |
-| 10. | [Evolution & Phase Exit](#10-evolution--phase-exit) |
-| 11. | [Known Failure Patterns](#11-known-failure-patterns) |
-| 12. | [Session Kickoff](#12-session-kickoff) |
+| #   | Section                                                                                   |
+| --- | ----------------------------------------------------------------------------------------- |
+| 1.  | [Project Type Routing](#1-project-type-routing)                                           |
+| 2.  | [Intent Decomposition (Recursive Breakdown)](#2-intent-decomposition-recursive-breakdown) |
+| 3.  | [Constitution (Immutable)](#3-constitution-immutable)                                     |
+| 4.  | [Phase Definitions](#4-phase-definitions)                                                 |
+| 5.  | [V1 Scope & Learning Shifts](#5-v1-scope--learning-shifts)                                |
+| 6.  | [AI Persona & Constraints](#6-ai-persona--constraints)                                    |
+| 7.  | [Stop Rules](#7-stop-rules)                                                               |
+| 8.  | [Verification Gates](#8-verification-gates)                                               |
+| 9.  | [Test Philosophy](#9-test-philosophy)                                                     |
+| 10. | [Evolution & Phase Exit](#10-evolution--phase-exit)                                       |
+| 11. | [Known Failure Patterns](#11-known-failure-patterns)                                      |
+| 12. | [Session Kickoff](#12-session-kickoff)                                                    |
 
 > **Single-source-of-truth:** RULES.md always wins on conflicts between protocol documents.
 > **Recursion meta-rule:** Every step is recursive: if a step's output is still ambiguous after one pass, apply it again deeper. Most problems resolve in 2-3 recursions.
@@ -226,12 +226,12 @@ The AI MUST stop and ask before proceeding if ANY of these are true:
 
 ## 8. Verification Gates
 
-| Phase | Must pass before reporting done |
-| --- | --- |
-| **DISCOVER** | Research summary complete, hypothesis tested, decision reached |
-| **WORK** | `cargo build --release` + `cargo test` passes + tests written BEFORE code |
-| **PERFECT** | `cargo clippy --all-features --all-targets -- -D warnings` + full test suite + cargo-deny + gitleaks + Constitution compliance + SPEC SYNC |
-| **DISTRIBUTE** | Spellcheck + link check + format conformance + package artifacts verified |
+| Phase          | Must pass before reporting done                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **DISCOVER**   | Research summary complete, hypothesis tested, decision reached                                                                             |
+| **WORK**       | `cargo build --release` + `cargo nextest run` passes + tests written BEFORE code                                                           |
+| **PERFECT**    | `cargo clippy --all-features --all-targets -- -D warnings` + full test suite + cargo-deny + gitleaks + Constitution compliance + SPEC SYNC |
+| **DISTRIBUTE** | Spellcheck + link check + format conformance + package artifacts verified                                                                  |
 
 ### SPEC SYNC (Spec-to-Code Fidelity Gate)
 
@@ -239,7 +239,7 @@ The spec-to-code fidelity verification gate runs after POLISH and before DISTRIB
 
 ### Local CI Parity
 
-`./scripts/check-local.sh` runs every local-movable gate the GitHub CI runs: clippy, cargo test, release build + symbol export verify + ABI smoke, cargo-deny, gitleaks. `./scripts/check-parity.sh` asserts local and GitHub CI agree on the same commit. Both must pass before any push.
+`./scripts/check-local.sh` runs every local-movable gate the GitHub CI runs: clippy, cargo nextest, release build + symbol export verify + ABI smoke, cargo-deny, gitleaks. `./scripts/check-parity.sh` asserts local and GitHub CI agree on the same commit. Both must pass before any push.
 
 ## 9. Test Philosophy
 
@@ -303,45 +303,46 @@ Phase Exit: [phase name]
 
 ### FP-CAT-1: Scope Expansion
 
-| ID | Pattern | Description |
-| --- | --- | --- |
-| FP-001 | Feature Creep | AI adds "helpful" features not in scope because nothing explicitly forbids them |
-| FP-002 | Polish Trap | Polishing before core works: triggered by AI suggesting cosmetic improvements |
-| FP-003 | Rabbit Hole | Deep optimization of something that might be removed |
+| ID     | Pattern                | Description                                                                                     |
+| ------ | ---------------------- | ----------------------------------------------------------------------------------------------- |
+| FP-001 | Feature Creep          | AI adds "helpful" features not in scope because nothing explicitly forbids them                 |
+| FP-002 | Polish Trap            | Polishing before core works: triggered by AI suggesting cosmetic improvements                   |
+| FP-003 | Rabbit Hole            | Deep optimization of something that might be removed                                            |
 | FP-004 | Learning Shift Cascade | One shift leads to another because the first reveals new information instead of inconsistencies |
 
 ### FP-CAT-2: Quality
 
-| ID | Pattern | Description |
-| --- | --- | --- |
-| FP-010 | Tautological Tests | Tests that pass on first run and only confirm what code already does |
-| FP-011 | Missing Edge Cases | Happy path works, edge cases crash silently |
+| ID     | Pattern            | Description                                                               |
+| ------ | ------------------ | ------------------------------------------------------------------------- |
+| FP-010 | Tautological Tests | Tests that pass on first run and only confirm what code already does      |
+| FP-011 | Missing Edge Cases | Happy path works, edge cases crash silently                               |
 | FP-012 | Security Blindness | AI generates functional code that skips auth, validation, or sanitization |
-| FP-013 | Dependency Bloat | Adding a library instead of writing 5 lines of code |
-| FP-014 | Context Decay | Later AI sessions contradict earlier decisions because context was lost |
+| FP-013 | Dependency Bloat   | Adding a library instead of writing 5 lines of code                       |
+| FP-014 | Context Decay      | Later AI sessions contradict earlier decisions because context was lost   |
 
 ### FP-CAT-3: Process
 
-| ID | Pattern | Description |
-| --- | --- | --- |
-| FP-020 | Phase Drift | Working on DISTRIBUTE tasks during WORK phase without realizing it |
-| FP-021 | Silent Pivot | Changing the approach without documenting or approving the change |
-| FP-022 | Assumption Hardening | Early assumptions become locked-in without being verified |
-| FP-023 | Review Debt | AI generates more code than can be reviewed, creating an accumulating backlog |
-| FP-024 | Confident Wrongness | Code compiles, runs, and is subtly incorrect: the hardest pattern to catch |
+| ID     | Pattern              | Description                                                                   |
+| ------ | -------------------- | ----------------------------------------------------------------------------- |
+| FP-020 | Phase Drift          | Working on DISTRIBUTE tasks during WORK phase without realizing it            |
+| FP-021 | Silent Pivot         | Changing the approach without documenting or approving the change             |
+| FP-022 | Assumption Hardening | Early assumptions become locked-in without being verified                     |
+| FP-023 | Review Debt          | AI generates more code than can be reviewed, creating an accumulating backlog |
+| FP-024 | Confident Wrongness  | Code compiles, runs, and is subtly incorrect: the hardest pattern to catch    |
 
 ### FP-CAT-4: Protocol Governance
 
-| ID | Pattern | Description |
-| --- | --- | --- |
-| FP-030 | Rule Rigidity | Protocol rules that help general cases actively slow down specific project types |
-| FP-031 | Over-governance | Spending more time managing the protocol than building the product |
-| FP-032 | Self-Audit Skipping | Rushing phase exits without running the self-audit |
-| FP-033 | Routing Error | Choosing the wrong route at bootstrap, forcing the project into the wrong phase sequence |
+| ID     | Pattern             | Description                                                                              |
+| ------ | ------------------- | ---------------------------------------------------------------------------------------- |
+| FP-030 | Rule Rigidity       | Protocol rules that help general cases actively slow down specific project types         |
+| FP-031 | Over-governance     | Spending more time managing the protocol than building the product                       |
+| FP-032 | Self-Audit Skipping | Rushing phase exits without running the self-audit                                       |
+| FP-033 | Routing Error       | Choosing the wrong route at bootstrap, forcing the project into the wrong phase sequence |
 
 ### Using Failure Patterns
 
 When the AI recognizes a failure pattern, it MUST:
+
 1. Flag it: "Warning: this looks like FP-001 (Feature Creep)."
 2. Explain why: "You asked for a decode plugin, but I'm adding an encoder. This was not in scope."
 3. Stop and ask: "Should I continue with this, or revert to the original scope?"
@@ -366,6 +367,7 @@ If blocked, refuse and explain. If clear, proceed."
 ## After Project: Close the Feedback Loop
 
 The protocol improves with each project. After shipping:
+
 1. **Routing check**: Did the bootstrap routing choose the right path? If not, update the decision tree.
 2. **Phase gate review**: Did phases have the right boundaries? Too strict or too loose? Adjust.
 3. **Stop rule audit**: Did the stop rules fire when needed? Any false negatives? Tighten.
